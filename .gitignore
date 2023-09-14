@@ -1,3 +1,4 @@
+virtual/
 dist/
 node_modules/
 cypress/plugins

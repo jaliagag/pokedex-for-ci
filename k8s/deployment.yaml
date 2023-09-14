@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${CI_PROJECT_NAME}
+  namespace: ${KUBE_NAMESPACE}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+  selector:
+    matchLabels:
+      app: ${CI_PROJECT_NAME}
+  template:
+    metadata:
+      labels:
+        app: ${CI_PROJECT_NAME}
+    spec:
+      serviceAccountName: ${KUBE_NAMESPACE}
+      automountServiceAccountToken: true
+      containers:
+        - name: ${CI_PROJECT_NAME}
+          image: ${CI_REGISTRY_IMAGE}:${CI_PIPELINE_IID}
+          ports:
+            - containerPort: ${PORT_NUMBER}
+              protocol: TCP
+          envFrom:
+            - secretRef:
+                name: secret-${CI_PROJECT_NAME}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: ${PORT_NUMBER}
+            initialDelaySeconds: 70
+            timeoutSeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: ${PORT_NUMBER}
+            initialDelaySeconds: 45
+            timeoutSeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              memory: 200Mi
+              cpu: 100m
+            limits:
+              memory: 200Mi
+              cpu: 100m
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: topology.kubernetes.io/zone
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+              weight: 100
+                #nodeSelector:
+                #  node.kubernetes.io/role: ${SELECTOR_ROLE}
+      imagePullSecrets:
+        - name: gitlab-registry-credentials
